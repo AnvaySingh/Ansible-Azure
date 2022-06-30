@@ -1,0 +1,15 @@
+---
+  - name: Find matching instances
+    ansible.builtin.set_fact:
+      matching_snapshots: "{{ matching_snapshots + [item.tags.snapshot_name] }}"
+    with_items: "{{ snapshots.response }}"
+    when:
+      - item.tags.snapshot_name is defined
+      - item.tags.machine_name is defined
+      - item.tags.machine_name|upper == "{{ vm_list_in_rg }}"|upper
+    delegate_to: localhost
+
+  - name: Print matching_snapshots list for debugging
+    ansible.builtin.debug:
+      var: matching_snapshots
+    delegate_to: localhost

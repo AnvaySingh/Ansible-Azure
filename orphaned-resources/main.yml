@@ -1,0 +1,95 @@
+---
+- hosts: all
+  gather_facts: no
+  tasks:
+  
+  - name: Initialize an empty list for vm nic
+    ansible.builtin.set_fact:
+      vm_nic: []
+    delegate_to: localhost
+    
+  - name: Initialize an empty list for all nics
+    ansible.builtin.set_fact:
+      all_nic: []
+    delegate_to: localhost
+    
+  - name: Initialize an empty list for all nics
+    ansible.builtin.set_fact:
+      all_machines: []
+    delegate_to: localhost    
+    
+  - name: Get network interfaces within a resource group
+    azure_rm_networkinterface_info:
+      resource_group: myResourceGroup
+    register: network_interfaces
+    
+  - name: List all nics
+    ansible.builtin.set_fact:
+      all_nic: "{{ all_nic + [item.name] }}"
+    with_items: "{{ network_interfaces.networkinterfaces }}"
+
+  - name: Get facts for all virtual machines of a resource group
+    azure_rm_virtualmachine_info:
+      resource_group: "{{ resource_group }}"
+    register: virtual_machines
+    
+  - name: Find all machines in RG
+    ansible.builtin.set_fact:
+      all_machines: "{{ all_machines + [item.name] }}"
+    with_items: "{{ virtual_machines.vms }}"
+    delegate_to: localhost    
+    
+  - name: List orphaned nics
+    include_tasks: tasks/orphaned_nics.yml
+    loop: "{{virtual_machines.vms}}"    
+    loop_control:
+    loop_var: vm_list
+    
+  - name: Print orphaned network interfaces list
+    debug:
+      var: {{ all_nic | difference(vm_nic) }}
+
+#############################################################
+
+  - name: Get facts for all managed disks
+    azure_rm_manageddisk_info:
+    register: all_managed_disks
+    
+  - name: List orphaned disks
+    include_tasks: tasks/orphaned_disks.yml
+    loop: "{{virtual_machines.vms}}"        
+    
+  - name: Print orphaned managed disks list
+    debug:
+      var: {{ all_managed_disks | difference(vm_disks) }}    
+
+##############################################################
+
+  - name: Initialize an empty list for the matching snapshots
+    ansible.builtin.set_fact:
+      matching_snapshots: []
+    delegate_to: localhost
+
+  - name: Get snapshot info
+    azure_rm_resource_info:
+      auth_source: cli
+      resource_group: "{{ resource_group }}"
+      provider: compute
+      resource_type: snapshots
+    register: snapshots
+
+  - name: Print snapshots list for debugging
+    debug:
+      var: snapshots
+
+  - debug: var=snapshots.response
+
+  - name: List orphaned snapshots
+    include_tasks: tasks/orphaned_snapshots.yml
+    loop: "{{all_machines}}"    
+    loop_control:
+    loop_var: vm_list_in_rg 
+    
+  - name: Print orphaned snapshots list for debugging
+    debug:
+      var: {{ snapshots | difference(matching_snapshots) }}

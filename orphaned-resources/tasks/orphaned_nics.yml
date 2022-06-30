@@ -1,0 +1,5 @@
+---
+  - name: Find nics from vms
+    ansible.builtin.set_fact:
+      vm_nic: "{{ vm_nic + [item.name] }}"
+    with_items: "{{ vm_list[0].network_interface_names }}"

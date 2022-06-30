@@ -1,0 +1,10 @@
+---
+  - name: Get facts for all unattached managed disks
+    azure_rm_manageddisk_info:
+      managed_by: '{{ item.id }}'
+    register: managed_disks
+      
+  - name: List all mds
+    ansible.builtin.set_fact:
+      vm_disks: "{{ vm_disks + [item.name] }}"
+    with_items: "{{ managed_disks }}"      
